@@ -1,6 +1,5 @@
 # Build and dependency artifacts
 target/
-Cargo.lock
 *.wasm
 *.wasm.d
 
