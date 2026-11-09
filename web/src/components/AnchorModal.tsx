@@ -195,3 +195,4 @@ export function AnchorModal({ isOpen, onClose, escrow }: AnchorModalProps) {
     </div>
   );
 }
+
