@@ -1,0 +1,40 @@
+# Build and dependency artifacts
+target/
+Cargo.lock
+*.wasm
+*.wasm.d
+
+# Node / Frontend
+node_modules/
+.next/
+out/
+build/
+dist/
+.pnpm-store/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.secret
+stellar-identity.json
+.stellar/
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Test coverage & logs
+coverage/
+*.lcov
+*.log
