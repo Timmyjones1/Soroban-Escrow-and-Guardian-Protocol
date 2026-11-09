@@ -28,4 +28,3 @@ pub fn extend_persistent_ttl(env: &Env, key: &DataKey) {
         .persistent()
         .extend_ttl(key, MIN_TTL_LEDGERS, MAX_TTL_LEDGERS);
 }
-

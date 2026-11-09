@@ -92,7 +92,10 @@ pub fn resolve_dispute(
         .get(&key)
         .ok_or(PolarisError::JobNotFound)?;
 
-    let arbiter = job.arbiter.as_ref().ok_or(PolarisError::NoArbiterConfigured)?;
+    let arbiter = job
+        .arbiter
+        .as_ref()
+        .ok_or(PolarisError::NoArbiterConfigured)?;
     arbiter.require_auth();
 
     if client_payout < 0 || freelancer_payout < 0 {
@@ -142,19 +145,19 @@ pub fn resolve_dispute(
     }
 
     let disp_key = DataKey::Dispute(job_id, milestone_id);
-    let mut dispute_record: DisputeRecord = env
-        .storage()
-        .persistent()
-        .get(&disp_key)
-        .unwrap_or(DisputeRecord {
-            job_id,
-            milestone_id,
-            initiator: arbiter.clone(),
-            reason: String::from_str(env, "Arbitration ruling"),
-            client_payout: 0,
-            freelancer_payout: 0,
-            resolved_at: 0,
-        });
+    let mut dispute_record: DisputeRecord =
+        env.storage()
+            .persistent()
+            .get(&disp_key)
+            .unwrap_or(DisputeRecord {
+                job_id,
+                milestone_id,
+                initiator: arbiter.clone(),
+                reason: String::from_str(env, "Arbitration ruling"),
+                client_payout: 0,
+                freelancer_payout: 0,
+                resolved_at: 0,
+            });
 
     dispute_record.client_payout = client_payout;
     dispute_record.freelancer_payout = freelancer_payout;

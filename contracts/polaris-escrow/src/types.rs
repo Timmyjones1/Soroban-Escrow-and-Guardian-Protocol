@@ -24,8 +24,8 @@ pub struct Milestone {
     pub id: u32,
     pub description: String,
     pub amount: i128,
-    pub deliver_by: u64,          // Unix timestamp
-    pub review_window: u64,       // Seconds client has to review after delivery
+    pub deliver_by: u64,    // Unix timestamp
+    pub review_window: u64, // Seconds client has to review after delivery
     pub delivered_at: u64,
     pub delivery_cid: BytesN<32>, // IPFS / Sha256 hash of deliverable
     pub delivery_uri: String,     // URL or metadata pointer

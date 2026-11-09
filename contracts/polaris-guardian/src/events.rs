@@ -34,4 +34,3 @@ impl GuardianEvents {
             .publish((symbol_short!("bounty_in"), funder.clone()), amount);
     }
 }
-

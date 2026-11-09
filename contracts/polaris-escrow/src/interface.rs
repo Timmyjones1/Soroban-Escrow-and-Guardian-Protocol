@@ -34,7 +34,8 @@ pub trait PolarisEscrowTrait {
         keeper: Address,
     ) -> Result<(), PolarisError>;
 
-    fn refund_deadline_missed(env: Env, job_id: u64, milestone_id: u32) -> Result<(), PolarisError>;
+    fn refund_deadline_missed(env: Env, job_id: u64, milestone_id: u32)
+        -> Result<(), PolarisError>;
 
     fn raise_dispute(
         env: Env,
@@ -54,11 +55,8 @@ pub trait PolarisEscrowTrait {
 
     fn get_job(env: Env, job_id: u64) -> Result<Job, PolarisError>;
 
-    fn get_dispute(
-        env: Env,
-        job_id: u64,
-        milestone_id: u32,
-    ) -> Result<DisputeRecord, PolarisError>;
+    fn get_dispute(env: Env, job_id: u64, milestone_id: u32)
+        -> Result<DisputeRecord, PolarisError>;
 
     fn get_job_count(env: Env) -> u64;
 

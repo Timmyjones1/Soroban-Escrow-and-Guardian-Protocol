@@ -54,10 +54,7 @@ impl PolarisGuardianContract {
         Ok(())
     }
 
-    pub fn set_escrow_contract(
-        env: Env,
-        escrow_contract: Address,
-    ) -> Result<(), GuardianError> {
+    pub fn set_escrow_contract(env: Env, escrow_contract: Address) -> Result<(), GuardianError> {
         let admin: Address = env
             .storage()
             .instance()
@@ -94,11 +91,7 @@ impl PolarisGuardianContract {
         Ok(())
     }
 
-    pub fn fund_bounty_pool(
-        env: Env,
-        funder: Address,
-        amount: i128,
-    ) -> Result<(), GuardianError> {
+    pub fn fund_bounty_pool(env: Env, funder: Address, amount: i128) -> Result<(), GuardianError> {
         funder.require_auth();
 
         if amount <= 0 {
@@ -186,7 +179,11 @@ impl PolarisGuardianContract {
 
     pub fn is_authorized_arbiter(env: Env, arbiter: Address) -> bool {
         let key = DataKey::Arbiter(arbiter);
-        if let Some(profile) = env.storage().persistent().get::<DataKey, ArbiterProfile>(&key) {
+        if let Some(profile) = env
+            .storage()
+            .persistent()
+            .get::<DataKey, ArbiterProfile>(&key)
+        {
             profile.active
         } else {
             false
@@ -326,7 +323,11 @@ impl PolarisGuardianContract {
     }
 
     pub fn get_bounty_balance(env: Env) -> i128 {
-        if let Some(token_addr) = env.storage().instance().get::<DataKey, Address>(&DataKey::BountyToken) {
+        if let Some(token_addr) = env
+            .storage()
+            .instance()
+            .get::<DataKey, Address>(&DataKey::BountyToken)
+        {
             token::Client::new(&env, &token_addr).balance(&env.current_contract_address())
         } else {
             0

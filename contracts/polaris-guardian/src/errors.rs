@@ -16,4 +16,3 @@ pub enum GuardianError {
     EscrowCallFailed = 10,
     InvalidActionKind = 11,
 }
-

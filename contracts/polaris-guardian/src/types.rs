@@ -48,12 +48,7 @@ pub struct Job {
 
 #[contractclient(name = "EscrowClient")]
 pub trait EscrowInterface {
-    fn claim_review_timeout_keeper(
-        env: Env,
-        job_id: u64,
-        milestone_id: u32,
-        keeper: Address,
-    );
+    fn claim_review_timeout_keeper(env: Env, job_id: u64, milestone_id: u32, keeper: Address);
 
     fn refund_deadline_missed(env: Env, job_id: u64, milestone_id: u32);
 

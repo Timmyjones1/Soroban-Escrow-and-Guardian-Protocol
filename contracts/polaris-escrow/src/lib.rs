@@ -76,7 +76,11 @@ impl PolarisEscrowTrait for PolarisEscrowContract {
         milestone_ops::claim_review_timeout_internal(&env, job_id, milestone_id, Some(keeper))
     }
 
-    fn refund_deadline_missed(env: Env, job_id: u64, milestone_id: u32) -> Result<(), PolarisError> {
+    fn refund_deadline_missed(
+        env: Env,
+        job_id: u64,
+        milestone_id: u32,
+    ) -> Result<(), PolarisError> {
         refund_ops::refund_deadline_missed(&env, job_id, milestone_id)
     }
 

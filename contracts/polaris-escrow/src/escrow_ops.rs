@@ -78,9 +78,7 @@ pub fn create_job(
         .get(&DataKey::JobCounter)
         .unwrap_or(0u64);
     let job_id = current_id + 1;
-    env.storage()
-        .instance()
-        .set(&DataKey::JobCounter, &job_id);
+    env.storage().instance().set(&DataKey::JobCounter, &job_id);
     extend_instance_ttl(env);
 
     let job = Job {

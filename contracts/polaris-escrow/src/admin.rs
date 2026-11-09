@@ -17,7 +17,9 @@ pub fn initialize(env: &Env, admin: &Address, keeper_fee_bps: u32) -> Result<(),
 
     env.storage().instance().set(&DataKey::Admin, admin);
     env.storage().instance().set(&DataKey::Paused, &false);
-    env.storage().instance().set(&DataKey::KeeperFeeBps, &keeper_fee_bps);
+    env.storage()
+        .instance()
+        .set(&DataKey::KeeperFeeBps, &keeper_fee_bps);
     env.storage().instance().set(&DataKey::JobCounter, &0u64);
 
     extend_instance_ttl(env);

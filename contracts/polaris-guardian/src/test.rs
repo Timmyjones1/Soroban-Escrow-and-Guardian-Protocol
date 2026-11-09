@@ -131,7 +131,10 @@ fn test_guardian_initialization_and_arbiter_registration() {
 
     assert!(guardian.is_authorized_arbiter(&arbiter));
     let profile = guardian.get_arbiter(&arbiter);
-    assert_eq!(profile.name, String::from_str(&env, "Stellar Arbitration DAO"));
+    assert_eq!(
+        profile.name,
+        String::from_str(&env, "Stellar Arbitration DAO")
+    );
     assert!(profile.is_multisig);
     assert!(profile.active);
 
