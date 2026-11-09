@@ -36,7 +36,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: wasm32-unknown-unknown
-      - name: Install Stellar CLI
-        run: cargo install --locked stellar-cli --features opt
-      - name: Build Contract WASM
-        run: stellar contract build
+      - name: Build Contract WASM Target
+        run: cargo build --package polaris-escrow --target wasm32-unknown-unknown --release

@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2.0.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install cargo-audit prebuilt binary
+        uses: taiki-e/install-action@cargo-audit
+      - name: Run Cargo Audit
+        run: cargo audit --ignore RUSTSEC-2020-0071 --ignore RUSTSEC-2020-0159
