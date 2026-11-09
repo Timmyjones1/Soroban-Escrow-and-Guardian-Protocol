@@ -1,57 +1,91 @@
 "use client";
 
 import React, { useState } from "react";
-import { CheckCircle2, Clock, AlertTriangle, ArrowUpRight, ShieldAlert, FileText } from "lucide-react";
+import {
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  ArrowUpRight,
+  ShieldAlert,
+  FileText,
+  ExternalLink,
+  Zap,
+  Percent,
+  Check,
+  RefreshCw,
+} from "lucide-react";
+import { CountdownTimer } from "./CountdownTimer";
+import { STELLAR_CONFIG } from "@/config/stellar";
 
-export interface EscrowItem {
-  id: number;
-  title: string;
-  client: string;
-  contractor: string;
-  arbiter: string;
-  total_amount: number;
-  remaining_balance: number;
-  released_amount: number;
-  status: "active" | "completed" | "disputed" | "refunded";
-  milestones: Array<{
-    index: number;
-    description: string;
-    amount: number;
-    deadline: number;
-    status: "pending" | "submitted" | "approved" | "refunded";
-    proof_hash?: string;
-  }>;
+export interface PayeeSplitItem {
+  payee: string;
+  bps: number;
 }
 
+export interface MilestoneItem {
+  id: number;
+  description: string;
+  amount: number; // in stroops or tokens
+  deliver_by: number; // unix timestamp
+  review_window: number; // seconds
+  delivered_at: number; // unix timestamp
+  delivery_cid?: string;
+  delivery_uri?: string;
+  status: "Funded" | "Delivered" | "Disputed" | "Resolved" | "Completed" | "Refunded";
+}
+
+export interface JobItem {
+  job_id: number;
+  title: string;
+  client: string;
+  freelancer: string;
+  arbiter?: string | null;
+  token: string;
+  total_amount: number;
+  current_milestone: number;
+  milestones: MilestoneItem[];
+  splits: PayeeSplitItem[];
+}
+
+export type EscrowItem = JobItem;
+
 interface EscrowListProps {
-  escrows: EscrowItem[];
+  jobs: JobItem[];
   userAddress: string | null;
-  onSubmitMilestone: (escrow: EscrowItem, milestoneIndex: number) => void;
-  onApproveMilestone: (escrow: EscrowItem, milestoneIndex: number) => void;
-  onRaiseDispute: (escrow: EscrowItem) => void;
-  onOpenAnchor: (escrow: EscrowItem) => void;
+  activeRole: "all" | "client" | "freelancer" | "arbiter";
+  onSubmitDelivery: (job: JobItem, milestoneId: number) => void;
+  onApproveMilestone: (job: JobItem, milestoneId: number) => void;
+  onClaimReviewTimeout: (job: JobItem, milestoneId: number) => void;
+  onRefundMissedDeadline: (job: JobItem, milestoneId: number) => void;
+  onRaiseDispute: (job: JobItem, milestoneId: number) => void;
+  onResolveDispute: (job: JobItem, milestoneId: number) => void;
 }
 
 export function EscrowList({
-  escrows,
+  jobs,
   userAddress,
-  onSubmitMilestone,
+  activeRole,
+  onSubmitDelivery,
   onApproveMilestone,
+  onClaimReviewTimeout,
+  onRefundMissedDeadline,
   onRaiseDispute,
-  onOpenAnchor,
+  onResolveDispute,
 }: EscrowListProps) {
-  const [expandedId, setExpandedId] = useState<number | null>(escrows[0]?.id || null);
+  const [expandedId, setExpandedId] = useState<number | null>(jobs[0]?.job_id || null);
 
   const formatAmount = (stroops: number) => (stroops / 10_000_000).toLocaleString();
   const truncate = (addr: string) => `${addr.slice(0, 4)}...${addr.slice(-4)}`;
 
-  if (escrows.length === 0) {
+  if (jobs.length === 0) {
     return (
-      <div className="bg-polaris-card border border-polaris-border rounded-2xl p-12 text-center">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
         <Clock className="w-10 h-10 text-slate-500 mx-auto mb-3" />
-        <h3 className="font-semibold text-slate-300">No Escrows Found</h3>
+        <h3 className="font-semibold text-slate-300">No Polaris Escrows Found</h3>
         <p className="text-xs text-slate-500 mt-1">
-          Create an escrow above or connect your Freighter wallet to query active contracts.
+          {activeRole !== "all"
+            ? `No active escrows where your connected address acts ${activeRole}.`
+            : "Initialize an escrow job above or switch your wallet filter."}
         </p>
       </div>
     );
@@ -59,164 +93,258 @@ export function EscrowList({
 
   return (
     <div className="space-y-4">
-      {escrows.map((escrow) => {
-        const percentReleased = Math.round(
-          (escrow.released_amount / escrow.total_amount) * 100
-        ) || 0;
-        const isExpanded = expandedId === escrow.id;
+      {jobs.map((job) => {
+        const isExpanded = expandedId === job.job_id;
+        const completedMilestones = job.milestones.filter((m) => m.status === "Completed").length;
+        const totalMilestones = job.milestones.length;
+        const progressPercent = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0;
 
         return (
           <div
-            key={escrow.id}
-            className="bg-polaris-card border border-polaris-border rounded-2xl overflow-hidden transition shadow-lg hover:border-slate-700"
+            key={job.job_id}
+            className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden transition shadow-xl hover:border-slate-700"
           >
-            {/* Header / Summary */}
+            {/* Summary Header */}
             <div
-              onClick={() => setExpandedId(isExpanded ? null : escrow.id)}
-              className="p-5 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4"
+              onClick={() => setExpandedId(isExpanded ? null : job.job_id)}
+              className="p-5 cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 select-none"
             >
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-mono bg-slate-800 text-slate-400 px-2 py-0.5 rounded">
-                    #{escrow.id}
+              <div className="space-y-1.5 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-mono bg-slate-800 text-cyan-400 border border-slate-700 px-2 py-0.5 rounded">
+                    Job #{job.job_id}
                   </span>
-                  <h3 className="font-semibold text-base text-white hover:text-sky-400 transition">
-                    {escrow.title}
+                  <h3 className="font-semibold text-base text-white hover:text-cyan-400 transition">
+                    {job.title}
                   </h3>
-                  <span
-                    className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
-                      escrow.status === "completed"
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : escrow.status === "disputed"
-                        ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                        : "bg-sky-500/10 text-sky-400 border border-sky-500/20"
-                    }`}
-                  >
-                    {escrow.status}
+                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                    {progressPercent === 100 ? "Completed" : `${progressPercent}% Progress`}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-4 text-xs text-slate-400 font-mono">
-                  <span>Client: {truncate(escrow.client)}</span>
-                  <span>•</span>
-                  <span>Contractor: {truncate(escrow.contractor)}</span>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-mono">
+                  <span>
+                    Client:{" "}
+                    <a
+                      href={`https://stellar.expert/explorer/testnet/account/${job.client}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-slate-300 hover:text-cyan-400 hover:underline"
+                    >
+                      {truncate(job.client)}
+                    </a>
+                  </span>
+                  <span>·</span>
+                  <span>
+                    Freelancer:{" "}
+                    <a
+                      href={`https://stellar.expert/explorer/testnet/account/${job.freelancer}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-slate-300 hover:text-cyan-400 hover:underline"
+                    >
+                      {truncate(job.freelancer)}
+                    </a>
+                  </span>
+                  {job.arbiter && (
+                    <>
+                      <span>·</span>
+                      <span>
+                        Arbiter:{" "}
+                        <a
+                          href={`https://stellar.expert/explorer/testnet/account/${job.arbiter}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-slate-300 hover:text-purple-400 hover:underline"
+                        >
+                          {truncate(job.arbiter)}
+                        </a>
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* Progress & Amount */}
-              <div className="flex items-center gap-6">
-                <div className="w-32">
-                  <div className="flex justify-between text-[11px] mb-1">
-                    <span className="text-slate-400 font-mono">{percentReleased}% Paid</span>
-                    <span className="text-slate-500 font-mono">
-                      {escrow.milestones.filter((m) => m.status === "approved").length}/
-                      {escrow.milestones.length}
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-gradient-to-r from-sky-400 to-indigo-500 h-full transition-all duration-500"
-                      style={{ width: `${percentReleased}%` }}
-                    />
-                  </div>
+              {/* Amount & Progress */}
+              <div className="flex items-center gap-6 self-start md:self-center">
+                <div className="text-right">
+                  <span className="text-xs text-slate-400 block">Total Escrow Value</span>
+                  <span className="text-base font-bold text-white">
+                    {formatAmount(job.total_amount)} USDC
+                  </span>
                 </div>
 
-                <div className="text-right">
-                  <div className="text-base font-bold text-white font-mono">
-                    {formatAmount(escrow.total_amount)} USDC
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-mono">
-                    {formatAmount(escrow.remaining_balance)} locked
-                  </div>
+                <div className="w-24 bg-slate-800 h-2 rounded-full overflow-hidden hidden sm:block">
+                  <div
+                    className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${progressPercent}%` }}
+                  />
                 </div>
               </div>
             </div>
 
-            {/* Expandable Milestones Accordion */}
+            {/* Expanded Milestones & Payee Splits */}
             {isExpanded && (
-              <div className="border-t border-polaris-border bg-slate-950/40 p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                    Contract Milestones
-                  </h4>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onOpenAnchor(escrow)}
-                      className="text-xs text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-lg flex items-center gap-1 transition"
+              <div className="border-t border-slate-800 bg-slate-950/60 p-5 space-y-5">
+                {/* Payee Splits Banner */}
+                <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl flex flex-wrap items-center gap-3 text-xs">
+                  <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                    <Percent className="w-3.5 h-3.5 text-emerald-400" />
+                    Payee Splits:
+                  </span>
+                  {job.splits.map((s, idx) => (
+                    <span
+                      key={idx}
+                      className="px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 font-mono text-[11px] border border-slate-700"
                     >
-                      <ArrowUpRight className="w-3.5 h-3.5" />
-                      <span>SEP Anchor Cashout</span>
-                    </button>
-                    {escrow.status === "active" && (
-                      <button
-                        onClick={() => onRaiseDispute(escrow)}
-                        className="text-xs text-rose-400 hover:text-rose-300 bg-rose-500/10 border border-rose-500/20 px-3 py-1 rounded-lg flex items-center gap-1 transition"
-                      >
-                        <ShieldAlert className="w-3.5 h-3.5" />
-                        <span>Dispute</span>
-                      </button>
-                    )}
-                  </div>
+                      {truncate(s.payee)} ({(s.bps / 100).toFixed(1)}%)
+                    </span>
+                  ))}
+                  <a
+                    href={`https://stellar.expert/explorer/testnet/contract/${STELLAR_CONFIG.contractId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-auto text-cyan-400 hover:underline flex items-center gap-1 text-[11px]"
+                  >
+                    SAC Escrow Contract <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
 
-                <div className="space-y-2">
-                  {escrow.milestones.map((milestone) => (
-                    <div
-                      key={milestone.index}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs gap-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        {milestone.status === "approved" ? (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                        ) : milestone.status === "submitted" ? (
-                          <Clock className="w-4 h-4 text-amber-400 shrink-0 animate-pulse" />
-                        ) : (
-                          <div className="w-4 h-4 rounded-full border border-slate-600 shrink-0" />
-                        )}
-                        <div>
-                          <div className="font-medium text-white">{milestone.description}</div>
-                          {milestone.proof_hash && (
-                            <div className="text-[11px] text-sky-400 font-mono mt-0.5 flex items-center gap-1">
-                              <FileText className="w-3 h-3" />
-                              <span>Proof: {milestone.proof_hash}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                {/* Milestones Timeline */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Milestone Schedule & Timelocks
+                  </h4>
 
-                      <div className="flex items-center justify-between sm:justify-end gap-4">
-                        <span className="font-bold text-white font-mono">
-                          {formatAmount(milestone.amount)} USDC
-                        </span>
+                  {job.milestones.map((m) => {
+                    const now = Math.floor(Date.now() / 1000);
+                    const isDeliveryDeadlinePassed = now > m.deliver_by;
+                    const reviewDeadline = m.delivered_at + m.review_window;
+                    const isReviewWindowPassed = m.status === "Delivered" && now >= reviewDeadline;
 
-                        <div className="flex items-center gap-2">
-                          {milestone.status === "pending" && (
-                            <button
-                              onClick={() => onSubmitMilestone(escrow, milestone.index)}
-                              className="px-3 py-1 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 transition font-medium"
-                            >
-                              Submit Deliverable
-                            </button>
-                          )}
-
-                          {milestone.status === "submitted" && (
-                            <button
-                              onClick={() => onApproveMilestone(escrow, milestone.index)}
-                              className="px-3 py-1 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition font-medium"
-                            >
-                              Approve & Release
-                            </button>
-                          )}
-
-                          {milestone.status === "approved" && (
-                            <span className="text-[11px] text-emerald-400 font-mono font-medium">
-                              Paid On-Chain
+                    return (
+                      <div
+                        key={m.id}
+                        className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4"
+                      >
+                        <div className="space-y-1.5 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-xs font-bold text-slate-300">
+                              #{m.id} {m.description}
                             </span>
+                            <span
+                              className={`text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full ${
+                                m.status === "Completed"
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                  : m.status === "Delivered"
+                                  ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
+                                  : m.status === "Disputed"
+                                  ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                                  : m.status === "Refunded"
+                                  ? "bg-slate-700 text-slate-400 border border-slate-600"
+                                  : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                              }`}
+                            >
+                              {m.status}
+                            </span>
+                          </div>
+
+                          {/* Countdown Timers */}
+                          <div className="flex flex-wrap items-center gap-3">
+                            {m.status === "Funded" && (
+                              <CountdownTimer
+                                targetTimestamp={m.deliver_by}
+                                label="Deliver By"
+                                expiredLabel="Deadline Missed (Refund Available)"
+                              />
+                            )}
+
+                            {m.status === "Delivered" && (
+                              <CountdownTimer
+                                targetTimestamp={reviewDeadline}
+                                label="Client Review Window"
+                                expiredLabel="Review Window Elapsed (Keeper Claimable)"
+                              />
+                            )}
+
+                            {m.delivery_cid && (
+                              <div className="text-[11px] font-mono text-purple-400 flex items-center gap-1">
+                                <FileText className="w-3.5 h-3.5" />
+                                <span>Proof CID: {m.delivery_cid.slice(0, 16)}...</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions for this Milestone */}
+                        <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
+                          <span className="font-bold text-sm text-white mr-2">
+                            {formatAmount(m.amount)} USDC
+                          </span>
+
+                          {/* Freelancer Action: Submit Delivery */}
+                          {m.status === "Funded" && !isDeliveryDeadlinePassed && (
+                            <button
+                              onClick={() => onSubmitDelivery(job, m.id)}
+                              className="px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold shadow transition"
+                            >
+                              Submit Delivery
+                            </button>
+                          )}
+
+                          {/* Client Action: Approve Delivery */}
+                          {m.status === "Delivered" && (
+                            <button
+                              onClick={() => onApproveMilestone(job, m.id)}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow transition flex items-center gap-1"
+                            >
+                              <Check className="w-3.5 h-3.5" /> Approve Payout
+                            </button>
+                          )}
+
+                          {/* Review Timeout Action (Freelancer or Keeper) */}
+                          {m.status === "Delivered" && isReviewWindowPassed && (
+                            <button
+                              onClick={() => onClaimReviewTimeout(job, m.id)}
+                              className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-semibold shadow transition flex items-center gap-1 animate-pulse"
+                              title="Client failed to review in time. Auto-claim payout with keeper micro-bounty."
+                            >
+                              <Zap className="w-3.5 h-3.5 text-amber-200" /> Claim Timeout
+                            </button>
+                          )}
+
+                          {/* Missed Deadline Refund Action */}
+                          {m.status === "Funded" && isDeliveryDeadlinePassed && (
+                            <button
+                              onClick={() => onRefundMissedDeadline(job, m.id)}
+                              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow transition"
+                            >
+                              Claim Missed Refund
+                            </button>
+                          )}
+
+                          {/* Dispute Actions */}
+                          {m.status === "Delivered" && (
+                            <button
+                              onClick={() => onRaiseDispute(job, m.id)}
+                              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/40 text-slate-300 hover:text-rose-400 border border-slate-700 text-xs font-semibold transition"
+                            >
+                              Dispute
+                            </button>
+                          )}
+
+                          {m.status === "Disputed" && (
+                            <button
+                              onClick={() => onResolveDispute(job, m.id)}
+                              className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow transition"
+                            >
+                              Arbiter Ruling
+                            </button>
                           )}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
