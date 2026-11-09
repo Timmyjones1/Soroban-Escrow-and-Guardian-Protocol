@@ -1,7 +1,9 @@
 #![cfg(test)]
+#![allow(clippy::inconsistent_digit_grouping)]
+#![allow(clippy::bool_assert_comparison)]
 
 use crate::{
-    types::{MilestoneInput, MilestoneStatus, EscrowStatus},
+    types::{EscrowStatus, MilestoneInput, MilestoneStatus},
     PolarisEscrowContract, PolarisEscrowContractClient,
 };
 use soroban_sdk::{
@@ -35,7 +37,9 @@ impl<'a> TestEnv<'a> {
         let client = PolarisEscrowContractClient::new(&env, &contract_id);
 
         let token_admin = Address::generate(&env);
-        let token_address = env.register_stellar_asset_contract_v2(token_admin.clone()).address();
+        let token_address = env
+            .register_stellar_asset_contract_v2(token_admin.clone())
+            .address();
         let token_client = token::Client::new(&env, &token_address);
         let token_admin_client = token::StellarAssetClient::new(&env, &token_address);
 
@@ -113,10 +117,14 @@ fn test_create_and_complete_escrow_lifecycle() {
 
     // Contractor submits milestone 0
     let proof_hash = String::from_str(&t.env, "ipfs://bafybeicontracts-v1");
-    t.client.submit_milestone(&t.contractor, &escrow_id, &0, &proof_hash);
+    t.client
+        .submit_milestone(&t.contractor, &escrow_id, &0, &proof_hash);
 
     let escrow_after_sub = t.client.get_escrow(&escrow_id);
-    assert_eq!(escrow_after_sub.milestones.get(0).unwrap().status, MilestoneStatus::Submitted);
+    assert_eq!(
+        escrow_after_sub.milestones.get(0).unwrap().status,
+        MilestoneStatus::Submitted
+    );
 
     // Employer approves milestone 0
     t.client.approve_milestone(&t.employer, &escrow_id, &0);
@@ -132,7 +140,8 @@ fn test_create_and_complete_escrow_lifecycle() {
 
     // Contractor submits and employer approves milestone 1
     let proof_2 = String::from_str(&t.env, "ipfs://bafybeifrontend-v1");
-    t.client.submit_milestone(&t.contractor, &escrow_id, &1, &proof_2);
+    t.client
+        .submit_milestone(&t.contractor, &escrow_id, &1, &proof_2);
     t.client.approve_milestone(&t.employer, &escrow_id, &1);
 
     // Verify final state
@@ -174,7 +183,8 @@ fn test_dispute_resolution_workflow() {
     assert_eq!(escrow.status, EscrowStatus::Disputed);
 
     // Arbiter inspects and resolves dispute: 50/50 split (2,000 to client, 2,000 to contractor)
-    t.client.resolve_dispute(&t.arbiter, &escrow_id, &2_000_0000000, &2_000_0000000);
+    t.client
+        .resolve_dispute(&t.arbiter, &escrow_id, &2_000_0000000, &2_000_0000000);
 
     assert_eq!(t.token_client.balance(&t.contractor), 2_000_0000000);
     assert_eq!(t.token_client.balance(&t.employer), 98_000_0000000); // 96k remaining + 2k returned
@@ -221,7 +231,6 @@ fn test_timeout_refund_after_deadline() {
     assert_eq!(escrow.remaining_balance, 0);
 }
 
-
 #[test]
 fn test_invariant_balance_preservation() {
     let t = TestEnv::setup();
@@ -253,11 +262,15 @@ fn test_invariant_balance_preservation() {
         initial_escrow.remaining_balance + initial_escrow.released_amount,
         initial_escrow.total_amount
     );
-    assert_eq!(t.token_client.balance(&t.contract_id), initial_escrow.total_amount);
+    assert_eq!(
+        t.token_client.balance(&t.contract_id),
+        initial_escrow.total_amount
+    );
 
     // Partial approval
     let proof = String::from_str(&t.env, "ipfs://proof-a");
-    t.client.submit_milestone(&t.contractor, &escrow_id, &0, &proof);
+    t.client
+        .submit_milestone(&t.contractor, &escrow_id, &0, &proof);
     t.client.approve_milestone(&t.employer, &escrow_id, &0);
 
     let mid_escrow = t.client.get_escrow(&escrow_id);
@@ -265,5 +278,8 @@ fn test_invariant_balance_preservation() {
         mid_escrow.remaining_balance + mid_escrow.released_amount,
         mid_escrow.total_amount
     );
-    assert_eq!(t.token_client.balance(&t.contract_id), mid_escrow.remaining_balance);
+    assert_eq!(
+        t.token_client.balance(&t.contract_id),
+        mid_escrow.remaining_balance
+    );
 }

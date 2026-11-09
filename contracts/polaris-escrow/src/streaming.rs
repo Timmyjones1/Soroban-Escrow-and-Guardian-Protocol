@@ -47,8 +47,17 @@ mod tests {
 
         assert_eq!(calculate_vested_amount(total, start, end, 50).unwrap(), 0);
         assert_eq!(calculate_vested_amount(total, start, end, 100).unwrap(), 0);
-        assert_eq!(calculate_vested_amount(total, start, end, 150).unwrap(), 500);
-        assert_eq!(calculate_vested_amount(total, start, end, 200).unwrap(), 1000);
-        assert_eq!(calculate_vested_amount(total, start, end, 250).unwrap(), 1000);
+        assert_eq!(
+            calculate_vested_amount(total, start, end, 150).unwrap(),
+            500
+        );
+        assert_eq!(
+            calculate_vested_amount(total, start, end, 200).unwrap(),
+            1000
+        );
+        assert_eq!(
+            calculate_vested_amount(total, start, end, 250).unwrap(),
+            1000
+        );
     }
 }

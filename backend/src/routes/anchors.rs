@@ -1,15 +1,10 @@
-use axum::{
-    extract::Query,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::Query, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
 #[derive(Deserialize)]
 pub struct OffRampQuoteQuery {
-    pub source_asset: String, // e.g. "USDC"
+    pub source_asset: String,  // e.g. "USDC"
     pub dest_currency: String, // e.g. "NGN", "BRL", "KES", "EUR"
     pub amount: f64,
 }
@@ -58,7 +53,10 @@ pub async fn get_offramp_quote(
         exchange_rate: rate,
         estimated_fee_usd: fee,
         eta_seconds: 15,
-        sep24_interactive_url: format!("https://{}/sep24/interactive?asset=USDC&amount={}", domain, query.amount),
+        sep24_interactive_url: format!(
+            "https://{}/sep24/interactive?asset=USDC&amount={}",
+            domain, query.amount
+        ),
     };
 
     Ok(Json(json!({ "status": "success", "quote": quote })))

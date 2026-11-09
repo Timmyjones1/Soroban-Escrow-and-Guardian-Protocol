@@ -1,4 +1,6 @@
-use polaris_backend::store::{EscrowModel, EscrowStatus, EscrowStore, MilestoneModel, MilestoneStatus};
+use polaris_backend::store::{
+    EscrowModel, EscrowStatus, EscrowStore, MilestoneModel, MilestoneStatus,
+};
 
 #[tokio::test]
 async fn test_store_escrow_insertion_and_query() {
@@ -38,7 +40,12 @@ async fn test_store_escrow_insertion_and_query() {
 
     // Update milestone
     let updated = store
-        .update_milestone_status(1, 0, MilestoneStatus::Submitted, Some("ipfs://hash123".to_string()))
+        .update_milestone_status(
+            1,
+            0,
+            MilestoneStatus::Submitted,
+            Some("ipfs://hash123".to_string()),
+        )
         .await;
     assert!(updated);
 

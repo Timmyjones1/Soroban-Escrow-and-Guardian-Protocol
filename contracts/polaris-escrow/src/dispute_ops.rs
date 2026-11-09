@@ -46,7 +46,9 @@ pub fn raise_dispute(
     };
 
     let dispute_key = DataKey::Dispute(escrow_id);
-    env.storage().persistent().set(&dispute_key, &dispute_record);
+    env.storage()
+        .persistent()
+        .set(&dispute_key, &dispute_record);
     extend_persistent_ttl(env, &dispute_key);
 
     PolarisEvents::dispute_raised(env, escrow_id, caller, reason);
@@ -127,13 +129,7 @@ pub fn resolve_dispute(
         extend_persistent_ttl(env, &dispute_key);
     }
 
-    PolarisEvents::dispute_resolved(
-        env,
-        escrow_id,
-        arbiter,
-        client_payout,
-        contractor_payout,
-    );
+    PolarisEvents::dispute_resolved(env, escrow_id, arbiter, client_payout, contractor_payout);
     Ok(())
 }
 

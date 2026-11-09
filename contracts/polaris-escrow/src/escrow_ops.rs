@@ -57,7 +57,9 @@ pub fn create_escrow(
         .get(&DataKey::EscrowCounter)
         .unwrap_or(0);
     count = count.checked_add(1).ok_or(PolarisError::MathOverflow)?;
-    env.storage().instance().set(&DataKey::EscrowCounter, &count);
+    env.storage()
+        .instance()
+        .set(&DataKey::EscrowCounter, &count);
     extend_instance_ttl(env);
 
     let escrow_record = Escrow {

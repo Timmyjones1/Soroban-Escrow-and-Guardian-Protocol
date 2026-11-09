@@ -30,7 +30,7 @@ impl EventIndexer {
             loop {
                 match self
                     .rpc_client
-                    .get_events(start_ledger, &[self.contract_id.clone()])
+                    .get_events(start_ledger, std::slice::from_ref(&self.contract_id))
                     .await
                 {
                     Ok(events) => {

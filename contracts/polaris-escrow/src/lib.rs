@@ -50,7 +50,15 @@ impl PolarisEscrowTrait for PolarisEscrowContract {
         title: String,
         milestones: Vec<MilestoneInput>,
     ) -> Result<u64, PolarisError> {
-        escrow_ops::create_escrow(&env, &client, &contractor, &arbiter, &token, &title, &milestones)
+        escrow_ops::create_escrow(
+            &env,
+            &client,
+            &contractor,
+            &arbiter,
+            &token,
+            &title,
+            &milestones,
+        )
     }
 
     fn submit_milestone(
@@ -91,11 +99,7 @@ impl PolarisEscrowTrait for PolarisEscrowContract {
         dispute_ops::resolve_dispute(&env, &arbiter, escrow_id, client_payout, contractor_payout)
     }
 
-    fn claim_timeout_refund(
-        env: Env,
-        client: Address,
-        escrow_id: u64,
-    ) -> Result<(), PolarisError> {
+    fn claim_timeout_refund(env: Env, client: Address, escrow_id: u64) -> Result<(), PolarisError> {
         refund_ops::claim_timeout_refund(&env, &client, escrow_id)
     }
 

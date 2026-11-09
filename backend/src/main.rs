@@ -1,8 +1,8 @@
 pub mod auth;
 pub mod config;
 pub mod indexer;
-pub mod rpc_client;
 pub mod routes;
+pub mod rpc_client;
 pub mod store;
 
 use crate::config::AppConfig;
@@ -26,7 +26,10 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let config = AppConfig::from_env();
-    info!("Initializing Stellar PolarisPay Backend with config: {:?}", config);
+    info!(
+        "Initializing Stellar PolarisPay Backend with config: {:?}",
+        config
+    );
 
     let store = EscrowStore::new();
     let rpc_client = SorobanRpcClient::new(config.rpc_url.clone());
@@ -48,11 +51,23 @@ async fn main() -> anyhow::Result<()> {
         .route("/health", get(routes::health::health_check))
         .route("/metrics", get(routes::health::metrics))
         .route("/auth/challenge", get(auth::generate_sep10_challenge))
-        .route("/api/v1/escrows", get(routes::escrows::list_escrows).post(routes::escrows::create_escrow_record))
+        .route(
+            "/api/v1/escrows",
+            get(routes::escrows::list_escrows).post(routes::escrows::create_escrow_record),
+        )
         .route("/api/v1/escrows/:id", get(routes::escrows::get_escrow))
-        .route("/api/v1/escrows/:id/milestones", get(routes::milestones::list_milestones))
-        .route("/api/v1/escrows/:id/milestones/:index", patch(routes::milestones::update_milestone))
-        .route("/api/v1/anchors/quote", get(routes::anchors::get_offramp_quote))
+        .route(
+            "/api/v1/escrows/:id/milestones",
+            get(routes::milestones::list_milestones),
+        )
+        .route(
+            "/api/v1/escrows/:id/milestones/:index",
+            patch(routes::milestones::update_milestone),
+        )
+        .route(
+            "/api/v1/anchors/quote",
+            get(routes::anchors::get_offramp_quote),
+        )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
         .with_state(store);

@@ -21,10 +21,15 @@ pub async fn get_escrow(
     Path(id): Path<u64>,
 ) -> impl IntoResponse {
     match store.get_escrow(id).await {
-        Some(escrow) => (StatusCode::OK, Json(json!({ "status": "success", "data": escrow }))),
+        Some(escrow) => (
+            StatusCode::OK,
+            Json(json!({ "status": "success", "data": escrow })),
+        ),
         None => (
             StatusCode::NOT_FOUND,
-            Json(json!({ "status": "error", "message": format!("Escrow with ID {} not found", id) })),
+            Json(
+                json!({ "status": "error", "message": format!("Escrow with ID {} not found", id) }),
+            ),
         ),
     }
 }

@@ -1,10 +1,10 @@
 use soroban_sdk::{contracttype, Env};
 
 pub const LEDGER_THRESHOLD_INSTANCE: u32 = 17_280; // ~ 1 day (5 sec ledgers)
-pub const EXTEND_TO_INSTANCE: u32 = 518_400;       // ~ 30 days
+pub const EXTEND_TO_INSTANCE: u32 = 518_400; // ~ 30 days
 
 pub const LEDGER_THRESHOLD_PERSISTENT: u32 = 17_280;
-pub const EXTEND_TO_PERSISTENT: u32 = 1_036_800;   // ~ 60 days
+pub const EXTEND_TO_PERSISTENT: u32 = 1_036_800; // ~ 60 days
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

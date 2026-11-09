@@ -83,8 +83,8 @@ impl SorobanRpcClient {
         if let Some(events_arr) = res_json["result"]["events"].as_array() {
             let mut parsed = Vec::new();
             for item in events_arr {
-                let event: RpcEventResponse = serde_json::from_value(item.clone())
-                    .unwrap_or_else(|_| RpcEventResponse {
+                let event: RpcEventResponse =
+                    serde_json::from_value(item.clone()).unwrap_or_else(|_| RpcEventResponse {
                         id: item["id"].as_str().unwrap_or("").to_string(),
                         paging_token: item["pagingToken"].as_str().map(|s| s.to_string()),
                         topic: vec![],

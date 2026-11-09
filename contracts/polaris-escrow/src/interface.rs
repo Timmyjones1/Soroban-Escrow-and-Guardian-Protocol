@@ -48,11 +48,7 @@ pub trait PolarisEscrowTrait {
         contractor_payout: i128,
     ) -> Result<(), PolarisError>;
 
-    fn claim_timeout_refund(
-        env: Env,
-        client: Address,
-        escrow_id: u64,
-    ) -> Result<(), PolarisError>;
+    fn claim_timeout_refund(env: Env, client: Address, escrow_id: u64) -> Result<(), PolarisError>;
 
     fn get_escrow(env: Env, escrow_id: u64) -> Result<Escrow, PolarisError>;
     fn get_dispute(env: Env, escrow_id: u64) -> Result<DisputeRecord, PolarisError>;

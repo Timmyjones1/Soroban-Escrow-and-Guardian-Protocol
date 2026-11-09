@@ -4,10 +4,8 @@ pub struct PolarisEvents;
 
 impl PolarisEvents {
     pub fn contract_initialized(env: &Env, admin: &Address) {
-        env.events().publish(
-            (symbol_short!("init"), admin.clone()),
-            admin.clone(),
-        );
+        env.events()
+            .publish((symbol_short!("init"), admin.clone()), admin.clone());
     }
 
     pub fn escrow_created(
@@ -49,12 +47,7 @@ impl PolarisEvents {
         );
     }
 
-    pub fn dispute_raised(
-        env: &Env,
-        escrow_id: u64,
-        initiator: &Address,
-        reason: &String,
-    ) {
+    pub fn dispute_raised(env: &Env, escrow_id: u64, initiator: &Address, reason: &String) {
         env.events().publish(
             (symbol_short!("disp_op"), escrow_id, initiator.clone()),
             reason.clone(),
@@ -74,15 +67,8 @@ impl PolarisEvents {
         );
     }
 
-    pub fn timeout_refunded(
-        env: &Env,
-        escrow_id: u64,
-        client: &Address,
-        amount: i128,
-    ) {
-        env.events().publish(
-            (symbol_short!("refund"), escrow_id, client.clone()),
-            amount,
-        );
+    pub fn timeout_refunded(env: &Env, escrow_id: u64, client: &Address, amount: i128) {
+        env.events()
+            .publish((symbol_short!("refund"), escrow_id, client.clone()), amount);
     }
 }
