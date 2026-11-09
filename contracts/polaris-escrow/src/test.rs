@@ -220,3 +220,50 @@ fn test_timeout_refund_after_deadline() {
     assert_eq!(escrow.status, EscrowStatus::Refunded);
     assert_eq!(escrow.remaining_balance, 0);
 }
+
+
+#[test]
+fn test_invariant_balance_preservation() {
+    let t = TestEnv::setup();
+
+    let mut milestones = Vec::new(&t.env);
+    milestones.push_back(MilestoneInput {
+        description: String::from_str(&t.env, "Milestone A"),
+        amount: 1_234_5678900,
+        deadline: 1000,
+    });
+    milestones.push_back(MilestoneInput {
+        description: String::from_str(&t.env, "Milestone B"),
+        amount: 8_765_4321100,
+        deadline: 2000,
+    });
+
+    let title = String::from_str(&t.env, "Invariant Test");
+    let escrow_id = t.client.create_escrow(
+        &t.employer,
+        &t.contractor,
+        &t.arbiter,
+        &t.token_address,
+        &title,
+        &milestones,
+    );
+
+    let initial_escrow = t.client.get_escrow(&escrow_id);
+    assert_eq!(
+        initial_escrow.remaining_balance + initial_escrow.released_amount,
+        initial_escrow.total_amount
+    );
+    assert_eq!(t.token_client.balance(&t.contract_id), initial_escrow.total_amount);
+
+    // Partial approval
+    let proof = String::from_str(&t.env, "ipfs://proof-a");
+    t.client.submit_milestone(&t.contractor, &escrow_id, &0, &proof);
+    t.client.approve_milestone(&t.employer, &escrow_id, &0);
+
+    let mid_escrow = t.client.get_escrow(&escrow_id);
+    assert_eq!(
+        mid_escrow.remaining_balance + mid_escrow.released_amount,
+        mid_escrow.total_amount
+    );
+    assert_eq!(t.token_client.balance(&t.contract_id), mid_escrow.remaining_balance);
+}
