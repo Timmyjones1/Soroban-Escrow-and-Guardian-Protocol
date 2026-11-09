@@ -1,12 +1,12 @@
 use crate::rpc_client::SorobanRpcClient;
-use crate::store::{EscrowStore, MilestoneStatus};
+use crate::store::EscrowStore;
 use std::sync::Arc;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info};
 
 pub struct EventIndexer {
     rpc_client: SorobanRpcClient,
-    store: EscrowStore,
+    pub store: EscrowStore,
     contract_id: String,
 }
 
