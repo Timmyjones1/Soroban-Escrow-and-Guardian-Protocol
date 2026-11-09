@@ -1,53 +1,50 @@
-use crate::admin::is_paused;
+use crate::admin::{get_keeper_fee_bps, is_paused};
 use crate::errors::PolarisError;
 use crate::events::PolarisEvents;
 use crate::storage::{extend_persistent_ttl, DataKey};
-use crate::types::{Escrow, EscrowStatus, MilestoneStatus};
-use soroban_sdk::{token, Address, Env, String, Vec};
+use crate::types::{EscrowStatus, Job, PayeeSplit};
+use soroban_sdk::{symbol_short, token, Address, BytesN, Env, String, Vec};
 
-pub fn submit_milestone(
+pub fn submit_delivery(
     env: &Env,
-    contractor: &Address,
-    escrow_id: u64,
-    milestone_index: u32,
-    proof_hash: &String,
+    job_id: u64,
+    milestone_id: u32,
+    delivery_cid: &BytesN<32>,
+    delivery_uri: &String,
 ) -> Result<(), PolarisError> {
     if is_paused(env) {
         return Err(PolarisError::ContractPaused);
     }
-    contractor.require_auth();
 
-    let escrow_key = DataKey::Escrow(escrow_id);
-    let mut escrow: Escrow = env
+    let key = DataKey::Job(job_id);
+    let mut job: Job = env
         .storage()
         .persistent()
-        .get(&escrow_key)
-        .ok_or(PolarisError::EscrowNotFound)?;
+        .get(&key)
+        .ok_or(PolarisError::JobNotFound)?;
 
-    if escrow.contractor != *contractor {
-        return Err(PolarisError::Unauthorized);
-    }
-    if escrow.status != EscrowStatus::Active {
-        return Err(PolarisError::EscrowAlreadyCompleted);
-    }
+    job.freelancer.require_auth();
 
-    let mut updated_milestones = Vec::new(env);
-    let mut found = false;
     let now = env.ledger().timestamp();
+    let mut found = false;
 
-    for m in escrow.milestones.iter() {
-        if m.index == milestone_index {
-            if m.status == MilestoneStatus::Approved {
-                return Err(PolarisError::MilestoneAlreadyApproved);
+    for i in 0..job.milestones.len() {
+        let mut m = job.milestones.get(i).unwrap();
+        if m.id == milestone_id {
+            if m.status != EscrowStatus::Funded {
+                return Err(PolarisError::MilestoneNotFunded);
             }
-            let mut updated = m.clone();
-            updated.status = MilestoneStatus::Submitted;
-            updated.proof_hash = proof_hash.clone();
-            updated.submitted_at = now;
-            updated_milestones.push_back(updated);
+            if now > m.deliver_by {
+                return Err(PolarisError::DeadlinePassed);
+            }
+
+            m.status = EscrowStatus::Delivered;
+            m.delivered_at = now;
+            m.delivery_cid = delivery_cid.clone();
+            m.delivery_uri = delivery_uri.clone();
+            job.milestones.set(i, m);
             found = true;
-        } else {
-            updated_milestones.push_back(m);
+            break;
         }
     }
 
@@ -55,96 +52,190 @@ pub fn submit_milestone(
         return Err(PolarisError::MilestoneNotFound);
     }
 
-    escrow.milestones = updated_milestones;
-    env.storage().persistent().set(&escrow_key, &escrow);
-    extend_persistent_ttl(env, &escrow_key);
+    env.storage().persistent().set(&key, &job);
+    extend_persistent_ttl(env, &key);
 
-    PolarisEvents::milestone_submitted(env, escrow_id, milestone_index, proof_hash);
+    PolarisEvents::delivery_submitted(env, job_id, milestone_id, delivery_cid, delivery_uri);
+
     Ok(())
 }
 
-pub fn approve_milestone(
+pub fn approve_milestone(env: &Env, job_id: u64, milestone_id: u32) -> Result<(), PolarisError> {
+    if is_paused(env) {
+        return Err(PolarisError::ContractPaused);
+    }
+
+    let key = DataKey::Job(job_id);
+    let mut job: Job = env
+        .storage()
+        .persistent()
+        .get(&key)
+        .ok_or(PolarisError::JobNotFound)?;
+
+    job.client.require_auth();
+
+    let mut milestone_amount: i128 = 0;
+    let mut found = false;
+
+    for i in 0..job.milestones.len() {
+        let mut m = job.milestones.get(i).unwrap();
+        if m.id == milestone_id {
+            if m.status == EscrowStatus::Completed {
+                return Err(PolarisError::MilestoneAlreadyApproved);
+            }
+            if m.status != EscrowStatus::Delivered && m.status != EscrowStatus::Funded {
+                return Err(PolarisError::MilestoneNotDelivered);
+            }
+
+            milestone_amount = m.amount;
+            m.status = EscrowStatus::Completed;
+            job.milestones.set(i, m);
+            found = true;
+            break;
+        }
+    }
+
+    if !found {
+        return Err(PolarisError::MilestoneNotFound);
+    }
+
+    // Distribute payment to splits
+    distribute_splits(env, &job.token, &job.splits, milestone_amount);
+
+    env.storage().persistent().set(&key, &job);
+    extend_persistent_ttl(env, &key);
+
+    PolarisEvents::milestone_approved(env, job_id, milestone_id, milestone_amount, &job.client);
+
+    Ok(())
+}
+
+pub fn claim_review_timeout_internal(
     env: &Env,
-    client: &Address,
-    escrow_id: u64,
-    milestone_index: u32,
+    job_id: u64,
+    milestone_id: u32,
+    keeper: Option<Address>,
 ) -> Result<(), PolarisError> {
     if is_paused(env) {
         return Err(PolarisError::ContractPaused);
     }
-    client.require_auth();
 
-    let escrow_key = DataKey::Escrow(escrow_id);
-    let mut escrow: Escrow = env
+    let key = DataKey::Job(job_id);
+    let mut job: Job = env
         .storage()
         .persistent()
-        .get(&escrow_key)
-        .ok_or(PolarisError::EscrowNotFound)?;
+        .get(&key)
+        .ok_or(PolarisError::JobNotFound)?;
 
-    if escrow.client != *client {
-        return Err(PolarisError::Unauthorized);
-    }
-    if escrow.status != EscrowStatus::Active {
-        return Err(PolarisError::EscrowAlreadyCompleted);
+    // If caller specified keeper address, require its auth
+    if let Some(ref k) = keeper {
+        k.require_auth();
     }
 
-    let mut updated_milestones = Vec::new(env);
-    let mut release_amount: i128 = 0;
-    let mut all_completed = true;
     let now = env.ledger().timestamp();
+    let mut milestone_amount: i128 = 0;
+    let mut found = false;
 
-    for m in escrow.milestones.iter() {
-        if m.index == milestone_index {
-            if m.status != MilestoneStatus::Submitted {
-                return Err(PolarisError::MilestoneNotSubmitted);
+    for i in 0..job.milestones.len() {
+        let mut m = job.milestones.get(i).unwrap();
+        if m.id == milestone_id {
+            if m.status != EscrowStatus::Delivered {
+                return Err(PolarisError::MilestoneNotDelivered);
             }
-            release_amount = m.amount;
-            let mut updated = m.clone();
-            updated.status = MilestoneStatus::Approved;
-            updated.approved_at = now;
-            updated_milestones.push_back(updated);
-        } else {
-            if m.status != MilestoneStatus::Approved {
-                all_completed = false;
+
+            let review_deadline = m
+                .delivered_at
+                .checked_add(m.review_window)
+                .ok_or(PolarisError::MathOverflow)?;
+
+            if now < review_deadline {
+                return Err(PolarisError::ReviewWindowNotElapsed);
             }
-            updated_milestones.push_back(m);
+
+            milestone_amount = m.amount;
+            m.status = EscrowStatus::Completed;
+            job.milestones.set(i, m);
+            found = true;
+            break;
         }
     }
 
-    if release_amount == 0 {
+    if !found {
         return Err(PolarisError::MilestoneNotFound);
     }
 
-    escrow.milestones = updated_milestones;
-    escrow.remaining_balance = escrow
-        .remaining_balance
-        .checked_sub(release_amount)
-        .ok_or(PolarisError::MathOverflow)?;
-    escrow.released_amount = escrow
-        .released_amount
-        .checked_add(release_amount)
-        .ok_or(PolarisError::MathOverflow)?;
+    // Determine keeper incentive if keeper is not the freelancer
+    let mut bounty: i128 = 0;
+    let mut distributable = milestone_amount;
 
-    if all_completed && escrow.remaining_balance == 0 {
-        escrow.status = EscrowStatus::Completed;
+    if let Some(ref k) = keeper {
+        if *k != job.freelancer {
+            let keeper_bps = get_keeper_fee_bps(env);
+            bounty = (milestone_amount * (keeper_bps as i128)) / 10_000;
+            if bounty > 0 {
+                token::Client::new(env, &job.token).transfer(
+                    &env.current_contract_address(),
+                    k,
+                    &bounty,
+                );
+                distributable = milestone_amount - bounty;
+            }
+        }
     }
 
-    env.storage().persistent().set(&escrow_key, &escrow);
-    extend_persistent_ttl(env, &escrow_key);
+    // Distribute remaining payout across payee splits
+    distribute_splits(env, &job.token, &job.splits, distributable);
 
-    let token_client = token::Client::new(env, &escrow.token);
-    token_client.transfer(
-        &env.current_contract_address(),
-        &escrow.contractor,
-        &release_amount,
-    );
+    env.storage().persistent().set(&key, &job);
+    extend_persistent_ttl(env, &key);
 
-    PolarisEvents::milestone_approved(
+    let caller_addr = keeper.unwrap_or_else(|| job.freelancer.clone());
+    PolarisEvents::review_timeout_claimed(
         env,
-        escrow_id,
-        milestone_index,
-        release_amount,
-        &escrow.contractor,
+        job_id,
+        milestone_id,
+        milestone_amount,
+        &caller_addr,
+        bounty,
     );
+
+    PolarisEvents::milestone_breached(
+        env,
+        job_id,
+        milestone_id,
+        symbol_short!("timeout"),
+        &job.freelancer,
+    );
+
     Ok(())
+}
+
+pub fn distribute_splits(
+    env: &Env,
+    token: &Address,
+    splits: &Vec<PayeeSplit>,
+    distributable_amount: i128,
+) {
+    if distributable_amount <= 0 || splits.is_empty() {
+        return;
+    }
+
+    let token_client = token::Client::new(env, token);
+    let mut distributed_sum: i128 = 0;
+    let splits_count = splits.len();
+
+    for i in 0..splits_count {
+        let split = splits.get(i).unwrap();
+        let amount = if i == splits_count - 1 {
+            // Remainder ensures zero rounding loss
+            distributable_amount - distributed_sum
+        } else {
+            (distributable_amount * (split.bps as i128)) / 10_000
+        };
+
+        if amount > 0 {
+            token_client.transfer(&env.current_contract_address(), &split.payee, &amount);
+            distributed_sum += amount;
+        }
+    }
 }

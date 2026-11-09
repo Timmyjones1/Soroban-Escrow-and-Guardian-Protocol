@@ -1,69 +1,59 @@
-use soroban_sdk::{contracttype, Address, String, Vec};
+use soroban_sdk::{contracttype, Address, BytesN, String, Vec};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum EscrowStatus {
-    Active,
+    Funded,
+    Delivered,
     Disputed,
+    Resolved,
     Completed,
     Refunded,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum MilestoneStatus {
-    Pending,
-    Submitted,
-    Approved,
-    Refunded,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MilestoneInput {
-    pub description: String,
-    pub amount: i128,
-    pub deadline: u64,
+pub struct PayeeSplit {
+    pub payee: Address,
+    pub bps: u32, // Basis points out of 10,000 (e.g., 8500 = 85%)
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Milestone {
-    pub index: u32,
+    pub id: u32,
     pub description: String,
     pub amount: i128,
-    pub deadline: u64,
-    pub status: MilestoneStatus,
-    pub proof_hash: String,
-    pub submitted_at: u64,
-    pub approved_at: u64,
+    pub deliver_by: u64,          // Unix timestamp
+    pub review_window: u64,       // Seconds client has to review after delivery
+    pub delivered_at: u64,
+    pub delivery_cid: BytesN<32>, // IPFS / Sha256 hash of deliverable
+    pub delivery_uri: String,     // URL or metadata pointer
+    pub status: EscrowStatus,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Escrow {
-    pub id: u64,
+pub struct Job {
+    pub job_id: u64,
     pub client: Address,
-    pub contractor: Address,
-    pub arbiter: Address,
-    pub token: Address,
+    pub freelancer: Address,
+    pub arbiter: Option<Address>, // Optional 3rd party arbitrator or DAO
+    pub token: Address,           // Stellar USDC or asset SAC address
     pub total_amount: i128,
-    pub remaining_balance: i128,
-    pub released_amount: i128,
-    pub status: EscrowStatus,
     pub milestones: Vec<Milestone>,
-    pub created_at: u64,
-    pub title: String,
+    pub splits: Vec<PayeeSplit>, // Dynamic splits (freelancer, agency, platform fee)
+    pub current_milestone: u32,
 }
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct DisputeRecord {
-    pub escrow_id: u64,
+    pub job_id: u64,
+    pub milestone_id: u32,
     pub initiator: Address,
     pub reason: String,
-    pub raised_at: u64,
-    pub resolved_at: u64,
     pub client_payout: i128,
-    pub contractor_payout: i128,
+    pub freelancer_payout: i128,
+    pub resolved_at: u64,
 }
